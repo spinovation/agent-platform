@@ -1,0 +1,121 @@
+# Multi-Tenant Autonomous Agent Platform - .gitattributes
+
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Source code
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.jsx text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.conf text eol=lf
+
+# Terraform
+*.tf text eol=lf
+*.tfvars text eol=lf
+*.hcl text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+
+# Batch scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=lf
+*.rst text eol=lf
+*.adoc text eol=lf
+
+# Web files
+*.html text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.sass text eol=lf
+*.less text eol=lf
+*.xml text eol=lf
+*.svg text eol=lf
+
+# Configuration files
+*.env text eol=lf
+Dockerfile text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf
+
+# Kubernetes
+*.k8s text eol=lf
+*.kube text eol=lf
+
+# Docker
+docker-compose*.yml text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+*.rar binary
+*.7z binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+
+# Font files
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.ttf binary
+*.otf binary
+
+# Archive files
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.xz binary
+
+# Database files
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Certificate files
+*.pem binary
+*.crt binary
+*.key binary
+*.p12 binary
+*.pfx binary
+
+# Linguist overrides for better language detection
+*.tf linguist-language=HCL
+*.tfvars linguist-language=HCL
+*.hcl linguist-language=HCL
+docs/* linguist-documentation
+examples/* linguist-documentation
+*.md linguist-documentation
+
+# Export ignore (files not included in git archive)
+.gitignore export-ignore
+.gitattributes export-ignore
+.github/ export-ignore
+docs/ export-ignore
+examples/ export-ignore
+tests/ export-ignore
+*.test.* export-ignore
+

@@ -1,0 +1,325 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  TERRAFORM_VERSION: '1.5.0'
+
+jobs:
+  # Infrastructure validation
+  infrastructure:
+    name: Infrastructure Validation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./infrastructure
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TERRAFORM_VERSION }}
+    
+    - name: Terraform Format Check
+      run: terraform fmt -check -recursive
+    
+    - name: Terraform Init
+      run: |
+        cd terraform
+        terraform init -backend=false
+    
+    - name: Terraform Validate
+      run: |
+        cd terraform
+        terraform validate
+    
+    - name: Terraform Plan (Dry Run)
+      run: |
+        cd terraform
+        terraform plan -var-file=terraform.tfvars.example -out=tfplan
+      env:
+        TF_VAR_project_name: "ci-test"
+        TF_VAR_environment: "ci"
+    
+    - name: TFSec Security Scan
+      uses: aquasecurity/tfsec-action@v1.0.3
+      with:
+        working_directory: ./infrastructure/terraform
+    
+    - name: Checkov Security Scan
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: ./infrastructure/terraform
+        framework: terraform
+
+  # Backend services
+  backend:
+    name: Backend Services
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    strategy:
+      matrix:
+        service: [api, agents, auth]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run linting
+      run: npm run lint
+    
+    - name: Run type checking
+      run: npm run type-check
+    
+    - name: Run unit tests
+      run: npm run test:unit
+    
+    - name: Run integration tests
+      run: npm run test:integration
+    
+    - name: Build service
+      run: npm run build
+    
+    - name: Security audit
+      run: npm audit --audit-level=high
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./backend/coverage/lcov.info
+        flags: backend-${{ matrix.service }}
+
+  # Frontend application
+  frontend:
+    name: Frontend Application
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run linting
+      run: npm run lint
+    
+    - name: Run type checking
+      run: npm run type-check
+    
+    - name: Run unit tests
+      run: npm run test
+    
+    - name: Build application
+      run: npm run build
+    
+    - name: Security audit
+      run: npm audit --audit-level=high
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./frontend/coverage/lcov.info
+        flags: frontend
+
+  # Agent framework
+  agents:
+    name: Agent Framework
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./agents
+    
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
+    
+    - name: Run linting
+      run: |
+        flake8 .
+        black --check .
+        isort --check-only .
+    
+    - name: Run type checking
+      run: mypy .
+    
+    - name: Run unit tests
+      run: pytest tests/unit/ -v --cov=./ --cov-report=xml
+    
+    - name: Run integration tests
+      run: pytest tests/integration/ -v
+    
+    - name: Security scan
+      run: |
+        bandit -r . -f json -o bandit-report.json
+        safety check
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./agents/coverage.xml
+        flags: agents
+
+  # Security scanning
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        languages: javascript, python
+    
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v3
+      if: github.event_name == 'pull_request'
+
+  # Documentation
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+    
+    - name: Install documentation dependencies
+      run: |
+        npm install -g @apidevtools/swagger-parser
+        npm install -g markdownlint-cli
+    
+    - name: Validate API documentation
+      run: |
+        if [ -f "docs/api/openapi.yml" ]; then
+          swagger-parser validate docs/api/openapi.yml
+        fi
+    
+    - name: Lint markdown files
+      run: markdownlint docs/ README.md
+    
+    - name: Check for broken links
+      uses: gaurav-nelson/github-action-markdown-link-check@v1
+      with:
+        use-quiet-mode: 'yes'
+        use-verbose-mode: 'yes'
+
+  # Integration tests
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [infrastructure, backend, frontend, agents]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup test environment
+      run: |
+        docker-compose -f docker-compose.test.yml up -d
+        sleep 30
+    
+    - name: Run end-to-end tests
+      run: |
+        npm run test:e2e
+    
+    - name: Cleanup test environment
+      run: |
+        docker-compose -f docker-compose.test.yml down
+      if: always()
+
+  # Notification
+  notify:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [infrastructure, backend, frontend, agents, security, documentation]
+    if: always()
+    
+    steps:
+    - name: Notify on success
+      if: ${{ needs.infrastructure.result == 'success' && needs.backend.result == 'success' && needs.frontend.result == 'success' && needs.agents.result == 'success' }}
+      run: echo "✅ All CI checks passed successfully!"
+    
+    - name: Notify on failure
+      if: ${{ needs.infrastructure.result == 'failure' || needs.backend.result == 'failure' || needs.frontend.result == 'failure' || needs.agents.result == 'failure' }}
+      run: |
+        echo "❌ CI checks failed!"
+        exit 1
+
