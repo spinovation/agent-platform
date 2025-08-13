@@ -1,0 +1,33 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "eks:CreateCluster",
+                "eks:DescribeCluster",
+                "eks:ListClusters",
+                "eks:UpdateClusterConfig",
+                "eks:UpdateClusterVersion",
+                "eks:DeleteCluster",
+                "eks:CreateNodegroup",
+                "eks:DescribeNodegroup",
+                "eks:ListNodegroups",
+                "eks:UpdateNodegroupConfig",
+                "eks:UpdateNodegroupVersion",
+                "eks:DeleteNodegroup",
+                "eks:DescribeUpdate",
+                "eks:ListUpdates",
+                "eks:TagResource",
+                "eks:UntagResource",
+                "eks:ListTagsForResource",
+                "eks:CreateAddon",
+                "eks:DescribeAddon",
+                "eks:UpdateAddon",
+                "eks:DeleteAddon",
+                "eks:ListAddons"
+            ],
+            "Resource": "*"
+        }
+    ]
+}

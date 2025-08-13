@@ -22,11 +22,11 @@ terraform {
       version = "~> 3.5"
     }
   }
-
-  backend "s3" {
+# Temporarily disable remote backend for initial setup
+#  backend "s3" {
     # Backend configuration will be provided via backend config file
     # terraform init -backend-config=backend.conf
-  }
+#  }
 }
 
 # Configure the AWS Provider
@@ -118,9 +118,8 @@ module "vpc" {
   tags = local.common_tags
 }
 
-# EKS Module
 module "eks" {
-  source = "terraform-aws-modules/eks/aws"
+  source  = "terraform-aws-modules/eks/aws"
   version = "~> 19.0"
 
   cluster_name    = local.cluster_name
@@ -131,13 +130,9 @@ module "eks" {
   cluster_endpoint_public_access = true
   cluster_endpoint_private_access = true
 
-  # Cluster access entry
-  enable_cluster_creator_admin_permissions = true
-
+  # Cluster access configuration
+  # Cluster addons
   cluster_addons = {
-    coredns = {
-      most_recent = true
-    }
     kube-proxy = {
       most_recent = true
     }
@@ -153,35 +148,19 @@ module "eks" {
   eks_managed_node_groups = {
     # General purpose node group
     general = {
-      name = "general"
-      
       instance_types = var.eks_node_instance_types
       
       min_size     = var.eks_node_group_min_size
       max_size     = var.eks_node_group_max_size
       desired_size = var.eks_node_group_desired_size
 
-      # Launch template configuration
-      create_launch_template = false
-      launch_template_name   = ""
-
       disk_size = 50
       disk_type = "gp3"
 
-      # Remote access
-      remote_access = {
-        ec2_ssh_key               = var.ec2_key_pair_name
-        source_security_group_ids = [aws_security_group.eks_remote_access.id]
-      }
-
-      # Kubernetes labels
       labels = {
         Environment = var.environment
         NodeGroup   = "general"
       }
-
-      # Kubernetes taints
-      taints = []
 
       tags = merge(local.common_tags, {
         NodeGroup = "general"
@@ -190,8 +169,6 @@ module "eks" {
 
     # Compute optimized node group for agent workloads
     compute = {
-      name = "compute"
-      
       instance_types = var.eks_compute_node_instance_types
       
       min_size     = 0
@@ -202,19 +179,13 @@ module "eks" {
       disk_type = "gp3"
 
       # Remote access
-      remote_access = {
-        ec2_ssh_key               = var.ec2_key_pair_name
-        source_security_group_ids = [aws_security_group.eks_remote_access.id]
-      }
 
-      # Kubernetes labels
       labels = {
-        Environment = var.environment
-        NodeGroup   = "compute"
+        Environment  = var.environment
+        NodeGroup    = "compute"
         WorkloadType = "agent"
       }
 
-      # Kubernetes taints for dedicated workloads
       taints = [
         {
           key    = "workload-type"
@@ -229,52 +200,8 @@ module "eks" {
     }
   }
 
-  # Cluster security group additional rules
-  cluster_security_group_additional_rules = {
-    ingress_nodes_ephemeral_ports_tcp = {
-      description                = "Nodes on ephemeral ports"
-      protocol                   = "tcp"
-      from_port                  = 1025
-      to_port                    = 65535
-      type                       = "ingress"
-      source_node_security_group = true
-    }
-  }
-
-  # Node security group additional rules
-  node_security_group_additional_rules = {
-    ingress_self_all = {
-      description = "Node to node all ports/protocols"
-      protocol    = "-1"
-      from_port   = 0
-      to_port     = 0
-      type        = "ingress"
-      self        = true
-    }
-    
-    ingress_cluster_all = {
-      description                   = "Cluster to node all ports/protocols"
-      protocol                      = "-1"
-      from_port                     = 0
-      to_port                       = 0
-      type                          = "ingress"
-      source_cluster_security_group = true
-    }
-    
-    egress_all = {
-      description      = "Node all egress"
-      protocol         = "-1"
-      from_port        = 0
-      to_port          = 0
-      type             = "egress"
-      cidr_blocks      = ["0.0.0.0/0"]
-      ipv6_cidr_blocks = ["::/0"]
-    }
-  }
-
   tags = local.common_tags
-}
-
+}    
 # Security group for EKS remote access
 resource "aws_security_group" "eks_remote_access" {
   name_prefix = "${local.cluster_name}-remote-access"
@@ -297,16 +224,6 @@ resource "aws_security_group" "eks_remote_access" {
 
   tags = merge(local.common_tags, {
     Name = "${local.cluster_name}-remote-access"
-  })
-}
-
-# RDS Subnet Group
-resource "aws_db_subnet_group" "main" {
-  name       = "${var.project_name}-${var.environment}-db-subnet-group"
-  subnet_ids = module.vpc.database_subnets
-
-  tags = merge(local.common_tags, {
-    Name = "${var.project_name}-${var.environment}-db-subnet-group"
   })
 }
 
@@ -355,7 +272,7 @@ resource "aws_db_instance" "main" {
   password = random_password.rds_password.result
 
   # Network configuration
-  db_subnet_group_name   = aws_db_subnet_group.main.name
+  db_subnet_group_name   = module.vpc.database_subnet_group_name
   vpc_security_group_ids = [aws_security_group.rds.id]
   publicly_accessible    = false
 
@@ -482,4 +399,5 @@ resource "random_password" "redis_auth_token" {
   length  = 32
   special = false
 }
+
 

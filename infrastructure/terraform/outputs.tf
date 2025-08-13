@@ -137,13 +137,13 @@ output "rds_instance_password" {
 }
 
 output "rds_subnet_group_id" {
-  description = "RDS subnet group ID"
-  value       = aws_db_subnet_group.main.id
+  description = "ID of the RDS subnet group"
+  value       = module.vpc.database_subnet_group_name
 }
 
 output "rds_subnet_group_arn" {
-  description = "RDS subnet group ARN"
-  value       = aws_db_subnet_group.main.arn
+  description = "ARN of the RDS subnet group"
+  value       = "arn:aws:rds:${var.aws_region}:${data.aws_caller_identity.current.account_id}:subgrp:${module.vpc.database_subnet_group_name}"
 }
 
 output "rds_security_group_id" {
@@ -238,11 +238,15 @@ output "availability_zones" {
 }
 
 # Kubectl Configuration Command
+#output "configure_kubectl" {
+# description = "Configure kubectl: make sure you're logged in with the correct AWS profile and run the following command to update your kubeconfig"
+#  value       = "aws eks --region ${var.aws_region} update-kubeconfig --name ${module.eks.cluster_id}"
+#}
+
 output "configure_kubectl" {
   description = "Configure kubectl: make sure you're logged in with the correct AWS profile and run the following command to update your kubeconfig"
-  value       = "aws eks --region ${var.aws_region} update-kubeconfig --name ${module.eks.cluster_id}"
+  value       = "aws eks --region us-east-1 update-kubeconfig --name agent-platform-dev-eks"
 }
-
 # Connection Information
 output "connection_info" {
   description = "Connection information for services"
@@ -257,4 +261,3 @@ output "connection_info" {
   }
   sensitive = false
 }
-
