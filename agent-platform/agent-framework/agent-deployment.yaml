@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-service
+  namespace: ai-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: agent-service
+  template:
+    metadata:
+      labels:
+        app: agent-service
+    spec:
+      containers:
+      - name: agent-service
+        image: agent-service:latest
+        ports:
+        - containerPort: 8001
+        env:
+        - name: LLM_SERVICE_URL
+          value: "http://llm-service:8000"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-service
+  namespace: ai-platform
+spec:
+  selector:
+    app: agent-service
+  ports:
+  - port: 8001
+    targetPort: 8001
+  type: ClusterIP
